@@ -15,24 +15,41 @@ from csrnet_model import CSRNet
 # CAMERA AREA CONFIGURATION
 # ============================================================
 
-CONFIG_FILE = "camera_config.json"
+def get_supabase_client():
+    import streamlit as st
+    from supabase import create_client
+
+    return create_client(
+        st.secrets["supabase"]["url"],
+        st.secrets["supabase"]["key"]
+    )
 
 
 def load_camera_config(camera_name):
-
-    if not os.path.exists(CONFIG_FILE):
-        return None
-
     try:
+        supabase = get_supabase_client()
 
-        with open(CONFIG_FILE, "r") as file:
-            configs = json.load(file)
+        response = (
+            supabase.table("camera_configs")
+            .select("*")
+            .eq("camera_name", camera_name)
+            .execute()
+        )
 
-        return configs.get(camera_name)
+        if not response.data:
+            return None
 
-    except Exception:
+        config = response.data[0]
 
-        return None
+        return {
+            "row1_area": config["row1_area"],
+            "row2_area": config["row2_area"],
+            "row3_area": config["row3_area"]
+        }
+
+    except Exception as e:
+        print(f"Error loading camera configuration: {e}")
+        raise
 
 
 def save_camera_config(
@@ -41,38 +58,14 @@ def save_camera_config(
     row2_area,
     row3_area
 ):
+    supabase = get_supabase_client()
 
-    configs = {}
-
-    if os.path.exists(CONFIG_FILE):
-
-        try:
-
-            with open(CONFIG_FILE, "r") as file:
-                configs = json.load(file)
-
-        except Exception:
-
-            configs = {}
-
-
-    configs[camera_name] = {
-
+    supabase.table("camera_configs").upsert({
+        "camera_name": camera_name,
         "row1_area": row1_area,
         "row2_area": row2_area,
         "row3_area": row3_area
-    }
-
-
-    with open(CONFIG_FILE, "w") as file:
-
-        json.dump(
-            configs,
-            file,
-            indent=4
-        )
-
-
+    }).execute()
 # ============================================================
 # CROWD DENSITY ESTIMATOR
 # ============================================================

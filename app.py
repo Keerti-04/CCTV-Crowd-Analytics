@@ -1,13 +1,16 @@
 
 import os
-import json
 import tempfile
 
 import cv2
 import streamlit as st
 import numpy as np
 
-from estimation import CrowdDensityEstimator
+from estimation import (
+    CrowdDensityEstimator,
+    load_camera_config,
+    save_camera_config
+)
 
 
 # ============================================================
@@ -15,7 +18,6 @@ from estimation import CrowdDensityEstimator
 # ============================================================
 
 MODEL_PATH = os.path.join("models", "CSRNet_SE.pth")
-CONFIG_FILE = "camera_config.json"
 
 st.set_page_config(
     page_title="CCTV Crowd Analytics",
@@ -27,30 +29,6 @@ st.set_page_config(
 # ============================================================
 # AREA CONFIGURATION
 # ============================================================
-
-def load_config():
-    if not os.path.exists(CONFIG_FILE):
-        return {}
-
-    try:
-        with open(CONFIG_FILE, "r") as file:
-            return json.load(file)
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def save_config(camera_name, row1, row2, row3):
-    configs = load_config()
-
-    configs[camera_name] = {
-        "row1_area": row1,
-        "row2_area": row2,
-        "row3_area": row3
-    }
-
-    with open(CONFIG_FILE, "w") as file:
-        json.dump(configs, file, indent=4)
-
 
 def get_saved_area(saved, key):
     if key not in saved:
@@ -92,8 +70,13 @@ if uploaded_file is not None:
         os.path.basename(uploaded_file.name)
     )[0]
 
-    configs = load_config()
-    saved = configs.get(camera_name, {})
+    try:
+        saved = load_camera_config(camera_name) or {}
+    except Exception as error:
+        st.error(
+            f"Could not load saved area configuration: {error}"
+        )
+        st.stop()
 
     st.subheader("Configure physical areas")
 
@@ -124,14 +107,20 @@ if uploaded_file is not None:
         )
 
     if st.button("Save Area Configuration"):
-        save_config(
-            camera_name,
-            None if row1_area == 0 else row1_area,
-            None if row2_area == 0 else row2_area,
-            None if row3_area == 0 else row3_area
-        )
+        try:
+            save_camera_config(
+                camera_name,
+                None if row1_area == 0 else row1_area,
+                None if row2_area == 0 else row2_area,
+                None if row3_area == 0 else row3_area
+            )
 
-        st.success("Area configuration saved.")
+            st.success("Area configuration saved.")
+
+        except Exception as error:
+            st.error(
+                f"Could not save area configuration: {error}"
+            )
 
     # ========================================================
     # FRAME SKIP OPTION
@@ -155,12 +144,18 @@ if uploaded_file is not None:
         row2_area = None if row2_area == 0 else row2_area
         row3_area = None if row3_area == 0 else row3_area
 
-        save_config(
-            camera_name,
-            row1_area,
-            row2_area,
-            row3_area
-        )
+        try:
+            save_camera_config(
+                camera_name,
+                row1_area,
+                row2_area,
+                row3_area
+            )
+        except Exception as error:
+            st.error(
+                f"Could not save area configuration: {error}"
+            )
+            st.stop()
 
         progress = st.progress(0)
         status = st.empty()
@@ -410,8 +405,6 @@ if uploaded_file is not None:
 
             with open(temp_output, "rb") as video_file:
                 output_video_bytes = video_file.read()
-
-            
 
             # ------------------------------------------------
             # ANALYSIS RESULTS
