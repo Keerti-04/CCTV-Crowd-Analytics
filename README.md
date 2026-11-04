@@ -53,7 +53,7 @@ Python and the project dependencies do not need to be installed separately becau
 ### 1. Clone the Repository
 
 ```bash
-git clone <https://github.com/Keerti-04/CCTV-Crowd-Analytics.git>
+git clone https://github.com/Keerti-04/CCTV-Crowd-Analytics.git
 cd CCTV-Crowd-Analytics
 ```
 
